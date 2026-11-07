@@ -3,16 +3,46 @@
   "version": "0.1.0",
   "private": true,
   "description": "桌面宠物工具：绿幕动画实时抠像，背景透明显示",
+  "author": "chensjfish",
   "main": "electron/main.js",
   "scripts": {
     "start": "node tools/run.js",
     "smoke": "node tools/run.js --smoke --user-data-dir=.smoke/profile",
-    "icon": "node tools/make-icon.js"
+    "icon": "node tools/make-icon.js",
+    "dist": "node tools/dist.js"
   },
   "devDependencies": {
-    "electron": "^45.0.0"
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
   },
   "dependencies": {
     "uiohook-napi": "^1.5.5"
+  },
+  "build": {
+    "appId": "com.chensjfish.pet",
+    "productName": "桌宠",
+    "copyright": "Copyright © 2026 chensjfish",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "*.mp4",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    }
   }
 }

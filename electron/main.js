@@ -14,7 +14,26 @@ proto.registerScheme();
 
 const APP_ROOT = app.getAppPath();
 const IS_SMOKE = process.argv.includes('--smoke');
-const SMOKE_OUT = path.join(APP_ROOT, '.smoke');
+// 打包后 appRoot 在只读的 asar 里，自检产物必须落到可写目录
+const SMOKE_OUT = process.env.PET_SMOKE_DIR
+  ? path.resolve(process.env.PET_SMOKE_DIR)
+  : path.join(process.cwd(), '.smoke');
+
+// 打包后 productName 会改变 userData 目录名，这里锁死，
+// 保证开发态与安装包读的是同一份配置和素材
+try {
+  app.setName('pet');
+  // 命令行显式指定 --user-data-dir 时优先用它（自检、多实例调试都靠这个隔离）
+  if (!app.commandLine.hasSwitch('user-data-dir')) {
+    const overrideData = process.env.PET_USER_DATA;
+    app.setPath(
+      'userData',
+      overrideData ? path.resolve(overrideData) : path.join(app.getPath('appData'), 'pet')
+    );
+  }
+} catch (err) {
+  console.log('[pet] 锁定 userData 路径失败', err && err.message);
+}
 
 let config = null;
 let petWin = null;

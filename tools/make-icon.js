@@ -1,7 +1,11 @@
 'use strict';
 
 /**
- * 生成托盘图标（32x32 RGBA PNG）。
+ * 生成应用图标：
+ *   assets/tray.png  托盘用 32x32
+ *   build/icon.png   256x256 母版
+ *   build/icon.ico   Windows 应用图标，内含 16/24/32/48/64/128/256 七个尺寸
+ *
  * 不引第三方图形库，直接按像素合成后手写 PNG 分块，4x 超采样做抗锯齿。
  * 用法：node tools/make-icon.js
  */
@@ -10,7 +14,6 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const SIZE = 32;
 const SS = 4; // 超采样倍数
 
 const BODY = [0x1d, 0x9e, 0x75];
@@ -23,57 +26,58 @@ function insideCircle(x, y, cx, cy, r) {
   return dx * dx + dy * dy <= r * r;
 }
 
-function render() {
-  const w = SIZE * SS;
-  const buffer = new Float32Array(SIZE * SIZE * 4);
+/** 用 0~1 的归一化坐标绘制，保证任意尺寸下造型一致 */
+function renderRGBA(size) {
+  const w = size * SS;
+  const acc = new Float32Array(size * size * 4);
 
-  const cx = 16;
-  const cy = 16;
-  const bodyR = 11;
+  const body = { cx: 0.5, cy: 0.5, r: 0.34 };
+  const eyes = [
+    { cx: 0.375, cy: 0.47, r: 0.082 },
+    { cx: 0.625, cy: 0.47, r: 0.082 },
+  ];
+  const pupils = [
+    { cx: 0.375, cy: 0.47, r: 0.038 },
+    { cx: 0.625, cy: 0.47, r: 0.038 },
+  ];
 
   for (let sy = 0; sy < w; sy++) {
     for (let sx = 0; sx < w; sx++) {
-      // 把超采样点映射回逻辑坐标
-      const x = (sx + 0.5) / SS;
-      const y = (sy + 0.5) / SS;
+      const x = (sx + 0.5) / w;
+      const y = (sy + 0.5) / w;
 
       let color = null;
+      if (insideCircle(x, y, body.cx, body.cy, body.r)) color = BODY;
+      for (const e of eyes) if (insideCircle(x, y, e.cx, e.cy, e.r)) color = EYE;
+      for (const p of pupils) if (insideCircle(x, y, p.cx, p.cy, p.r)) color = PUPIL;
 
-      if (insideCircle(x, y, cx, cy, bodyR)) color = BODY;
-      if (insideCircle(x, y, cx - 4, cy - 1, 2.6)) color = EYE;
-      if (insideCircle(x, y, cx + 4, cy - 1, 2.6)) color = EYE;
-      if (insideCircle(x, y, cx - 4, cy - 1, 1.2)) color = PUPIL;
-      if (insideCircle(x, y, cx + 4, cy - 1, 1.2)) color = PUPIL;
-
+      if (!color) continue;
       const px = Math.floor(sx / SS);
       const py = Math.floor(sy / SS);
-      const idx = (py * SIZE + px) * 4;
-      if (color) {
-        buffer[idx] += color[0];
-        buffer[idx + 1] += color[1];
-        buffer[idx + 2] += color[2];
-        buffer[idx + 3] += 255;
-      }
+      const idx = (py * size + px) * 4;
+      acc[idx] += color[0];
+      acc[idx + 1] += color[1];
+      acc[idx + 2] += color[2];
+      acc[idx + 3] += 255;
     }
   }
 
-  const raw = Buffer.alloc(SIZE * SIZE * 4);
+  const out = Buffer.alloc(size * size * 4);
   const samples = SS * SS;
-  for (let i = 0; i < SIZE * SIZE; i++) {
-    raw[i * 4] = Math.round(buffer[i * 4] / samples);
-    raw[i * 4 + 1] = Math.round(buffer[i * 4 + 1] / samples);
-    raw[i * 4 + 2] = Math.round(buffer[i * 4 + 2] / samples);
-    raw[i * 4 + 3] = Math.round(buffer[i * 4 + 3] / samples);
+  for (let i = 0; i < size * size; i++) {
+    out[i * 4] = Math.round(acc[i * 4] / samples);
+    out[i * 4 + 1] = Math.round(acc[i * 4 + 1] / samples);
+    out[i * 4 + 2] = Math.round(acc[i * 4 + 2] / samples);
+    out[i * 4 + 3] = Math.round(acc[i * 4 + 3] / samples);
   }
-  return raw;
+  return out;
 }
 
 function crc32(buf) {
-  let c;
   const table = crc32.table || (crc32.table = (() => {
     const t = new Int32Array(256);
     for (let n = 0; n < 256; n++) {
-      c = n;
+      let c = n;
       for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
       t[n] = c;
     }
@@ -93,34 +97,71 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crcBuf]);
 }
 
-function encodePng(raw, width, height) {
+function encodePng(rgba, size) {
   const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // RGBA
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
   ihdr[10] = 0;
   ihdr[11] = 0;
   ihdr[12] = 0;
 
-  const stride = width * 4;
-  const scanlines = Buffer.alloc((stride + 1) * height);
-  for (let y = 0; y < height; y++) {
+  const stride = size * 4;
+  const scanlines = Buffer.alloc((stride + 1) * size);
+  for (let y = 0; y < size; y++) {
     scanlines[y * (stride + 1)] = 0;
-    raw.copy(scanlines, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
+    rgba.copy(scanlines, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
   }
 
-  const idat = zlib.deflateSync(scanlines, { level: 9 });
   return Buffer.concat([
     sig,
     chunk('IHDR', ihdr),
-    chunk('IDAT', idat),
+    chunk('IDAT', zlib.deflateSync(scanlines, { level: 9 })),
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
 
-const out = path.join(__dirname, '..', 'assets', 'tray.png');
-fs.mkdirSync(path.dirname(out), { recursive: true });
-fs.writeFileSync(out, encodePng(render(), SIZE, SIZE));
-console.log('写入', out);
+/** ICO 直接内嵌 PNG 数据，Vista 之后 Windows 原生支持 */
+function encodeIco(items) {
+  const count = items.length;
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(count, 4);
+
+  const dir = Buffer.alloc(16 * count);
+  let offset = 6 + 16 * count;
+
+  items.forEach((item, i) => {
+    const base = i * 16;
+    dir[base] = item.size >= 256 ? 0 : item.size;
+    dir[base + 1] = item.size >= 256 ? 0 : item.size;
+    dir[base + 2] = 0;
+    dir[base + 3] = 0;
+    dir.writeUInt16LE(1, base + 4);
+    dir.writeUInt16LE(32, base + 6);
+    dir.writeUInt32LE(item.png.length, base + 8);
+    dir.writeUInt32LE(offset, base + 12);
+    offset += item.png.length;
+  });
+
+  return Buffer.concat([header, dir, ...items.map((p) => p.png)]);
+}
+
+function write(file, buf) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, buf);
+  console.log('写入', path.relative(process.cwd(), file), buf.length + ' B');
+}
+
+const root = path.join(__dirname, '..');
+const png = (size) => encodePng(renderRGBA(size), size);
+
+write(path.join(root, 'assets', 'tray.png'), png(32));
+write(path.join(root, 'build', 'icon.png'), png(256));
+write(
+  path.join(root, 'build', 'icon.ico'),
+  encodeIco([16, 24, 32, 48, 64, 128, 256].map((s) => ({ size: s, png: png(s) })))
+);

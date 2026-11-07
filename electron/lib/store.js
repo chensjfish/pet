@@ -7,13 +7,17 @@ const { app } = require('electron');
 
 const CONFIG_VERSION = 1;
 
-/** 抠像默认参数：按“绿幕 + 人物主体 + 深色细节”这一类常见素材调出来的起点值 */
+/**
+ * 抠像默认参数。
+ * 键色取亮绿而不是 SMPTE 的 #00B140：实际素材（AI 生成、游戏导出）绝大多数是接近纯绿的
+ * #00E100 一类，用暗绿做默认会让色差本身吃掉大半个阈值，主体被误判成背景。
+ */
 const DEFAULT_KEYING = Object.freeze({
-  keyColor: '#00b140',
-  similarity: 0.32,
+  keyColor: '#00e100',
+  similarity: 0.15,
   smoothness: 0.14,
-  spill: 0.65,
-  shrink: 1,
+  spill: 0.9,
+  shrink: 2,
   lumaFloor: 0.06,
   opacity: 1,
 });

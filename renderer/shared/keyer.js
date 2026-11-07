@@ -76,11 +76,11 @@ void main() {
 `;
 
 export const DEFAULT_PARAMS = {
-  keyColor: '#00b140',
-  similarity: 0.32,
+  keyColor: '#00e100',
+  similarity: 0.15,
   smoothness: 0.14,
-  spill: 0.65,
-  shrink: 1,
+  spill: 0.9,
+  shrink: 2,
   lumaFloor: 0.06,
   opacity: 1,
 };
