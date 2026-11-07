@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+<title>桌宠</title>
+<link rel="stylesheet" href="./pet.css" />
+</head>
+<body>
+  <div id="stage">
+    <canvas class="layer" id="layerA"></canvas>
+    <canvas class="layer" id="layerB"></canvas>
+  </div>
+  <video class="source" id="videoA" playsinline muted loop preload="auto"></video>
+  <video class="source" id="videoB" playsinline muted loop preload="auto"></video>
+  <script type="module" src="./pet.js"></script>
+</body>
+</html>

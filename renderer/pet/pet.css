@@ -1,0 +1,48 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+#stage.dragging {
+  cursor: grabbing;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+  display: block;
+}
+
+.layer.visible {
+  opacity: 1;
+}
+
+/* 视频只做解码源，不参与显示：真正的可见面只有 canvas，
+   这样透明窗口里不存在视频图层与 DWM 合成的冲突 */
+.source {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
