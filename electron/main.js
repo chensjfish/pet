@@ -85,12 +85,16 @@ function broadcast(exceptWebContents) {
 
 function applyPatch(patch) {
   if (!patch || typeof patch !== 'object') return;
+  const prevZoom = config.pet.zoom;
   if (Array.isArray(patch.functions)) config.functions = patch.functions;
   if (Array.isArray(patch.assets)) config.assets = patch.assets;
   if (patch.pet) config.pet = Object.assign({}, config.pet, patch.pet);
   if (patch.behavior) config.behavior = Object.assign({}, config.behavior, patch.behavior);
   if (patch.system) config.system = Object.assign({}, config.system, patch.system);
   save();
+  if (config.pet.zoom !== prevZoom && petWin && !petWin.isDestroyed()) {
+    petWin.webContents.send('pet:refit');
+  }
 }
 
 /* -------------------------------------------------------------- 位置 */
@@ -117,12 +121,12 @@ function resolvePetPosition(w, h) {
 function petBaseSize() {
   const idle = config.functions.find((f) => f.id === 'idle');
   const asset = findAsset(idle && idle.assetId);
-  const scale = config.pet.scale || 0.4;
+  const scale = store.effectiveScale(config.pet.zoom);
   const bw = (asset && asset.width) || 720;
   const bh = (asset && asset.height) || 720;
   return {
-    width: Math.max(80, Math.round(bw * scale)),
-    height: Math.max(80, Math.round(bh * scale)),
+    width: Math.max(24, Math.round(bw * scale)),
+    height: Math.max(24, Math.round(bh * scale)),
   };
 }
 
@@ -198,7 +202,6 @@ function createPetWindow() {
   const show = () => {
     if (!petWin || petWin.isDestroyed()) return;
     petWin.showInactive();
-    petWin.setIgnoreMouseEvents(!!config.pet.clickThrough, { forward: true });
   };
   petWin.once('ready-to-show', show);
   setTimeout(show, 1500);
@@ -261,9 +264,29 @@ function openSettings() {
   return settingsWin;
 }
 
-function applyClickThrough() {
-  if (!petWin || petWin.isDestroyed()) return;
-  petWin.setIgnoreMouseEvents(!!config.pet.clickThrough, { forward: true });
+/**
+ * 缩放菜单项。
+ * 不用 radio 类型：Windows 原生菜单只要出现勾选类条目，就会给整列留出勾选槽，
+ * 左侧空白会明显变宽。改成普通条目 + 行尾打勾，标签就能贴边显示。
+ */
+function buildZoomItems() {
+  const idle = config.functions.find((f) => f.id === 'idle');
+  const asset = findAsset(idle && idle.assetId);
+  const refHeight = (asset && asset.height) || 720;
+  const current = config.pet.zoom || 100;
+  return store.PET_ZOOMS.map((z) => ({
+    label:
+      `${z}%   ${Math.round(refHeight * store.effectiveScale(z))}px 高` +
+      (z === current ? '  ✓' : ''),
+    click: () => setPetZoom(z),
+  }));
+}
+
+function setPetZoom(zoom) {
+  if (!store.PET_ZOOMS.includes(zoom)) return;
+  applyPatch({ pet: { zoom } });   // applyPatch 内部会通知渲染层重新适配尺寸
+  broadcast();
+  refreshTrayMenu();
 }
 
 function refreshTrayMenu() {
@@ -280,22 +303,8 @@ function refreshTrayMenu() {
           return;
         }
         if (petWin.isVisible()) petWin.hide();
-        else {
-          petWin.showInactive();
-          applyClickThrough();
-        }
+        else petWin.showInactive();
         refreshTrayMenu();
-      },
-    },
-    {
-      label: '鼠标穿透',
-      type: 'checkbox',
-      checked: !!config.pet.clickThrough,
-      click: (item) => {
-        config.pet.clickThrough = item.checked;
-        save();
-        applyClickThrough();
-        broadcast();
       },
     },
     { type: 'separator' },
@@ -439,12 +448,20 @@ function registerIpc() {
 
   ipcMain.handle('pet:fit', (_e, size) => {
     if (!petWin || petWin.isDestroyed() || !size) return null;
-    const scale = config.pet.scale || 0.4;
-    const w = Math.max(80, Math.round((size.width || 720) * scale));
-    const h = Math.max(80, Math.round((size.height || 720) * scale));
+    const scale = store.effectiveScale(config.pet.zoom);
+    const w = Math.max(24, Math.round((size.width || 720) * scale));
+    const h = Math.max(24, Math.round((size.height || 720) * scale));
     const b = petWin.getBounds();
     if (b.width === w && b.height === h) return b;
-    const next = { x: b.x, y: b.y + b.height - h, width: w, height: h };
+
+    // 以左下角为锚点缩放，宠物"站"的位置不变；再夹回工作区，避免放大后跑出屏幕
+    const area = screen.getDisplayMatching(b).workArea;
+    const next = {
+      x: Math.min(Math.max(b.x, area.x), area.x + area.width - w),
+      y: Math.min(Math.max(b.y + b.height - h, area.y), area.y + area.height - h),
+      width: w,
+      height: h,
+    };
     petWin.setBounds(next);
     return next;
   });
@@ -453,18 +470,7 @@ function registerIpc() {
     if (!petWin) return;
     const menu = Menu.buildFromTemplate([
       { label: '打开配置面板', click: () => openSettings() },
-      {
-        label: '鼠标穿透',
-        type: 'checkbox',
-        checked: !!config.pet.clickThrough,
-        click: (item) => {
-          config.pet.clickThrough = item.checked;
-          save();
-          applyClickThrough();
-          broadcast();
-          refreshTrayMenu();
-        },
-      },
+      { label: '桌宠大小', submenu: buildZoomItems() },
       { type: 'separator' },
       { label: '隐藏桌宠', click: () => { petWin.hide(); refreshTrayMenu(); } },
       { type: 'separator' },
@@ -573,6 +579,38 @@ async function runSmoke() {
     await delay(1800);
     await shot(petWin, 'pet-back-to-idle');
     await dump('back');
+  }
+
+  // 缩放验证：100% → 150%，确认窗口按比例放大、左下角不动
+  if (petWin && !petWin.isDestroyed() && settingsWin && !settingsWin.isDestroyed()) {
+    try {
+      await settingsWin.webContents.executeJavaScript(`window.api.patchConfig({ pet: { zoom: 100 } })`);
+      await delay(400);
+      const base = petWin.getBounds();
+
+      await settingsWin.webContents.executeJavaScript(`window.api.patchConfig({ pet: { zoom: 150 } })`);
+      await delay(900);
+      const zoomed = petWin.getBounds();
+      await shot(petWin, 'pet-zoom150');
+
+      await settingsWin.webContents.executeJavaScript(`window.api.patchConfig({ pet: { zoom: 20 } })`);
+      await delay(900);
+      const small = petWin.getBounds();
+      await shot(petWin, 'pet-zoom20');
+
+      await settingsWin.webContents.executeJavaScript(`window.api.patchConfig({ pet: { zoom: 100 } })`);
+      await delay(600);
+      log('缩放验证', JSON.stringify({ base, zoomed, small }));
+    } catch (err) {
+      log('缩放验证失败', err.message);
+    }
+
+    try {
+      const m = Menu.buildFromTemplate([{ label: '桌宠大小', submenu: buildZoomItems() }]);
+      log('大小菜单项', JSON.stringify(m.items[0].submenu.items.map((i) => i.label)));
+    } catch (err) {
+      log('大小菜单构建失败', err.message);
+    }
   }
 
   try {

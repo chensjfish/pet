@@ -22,13 +22,26 @@ const DEFAULT_KEYING = Object.freeze({
   opacity: 1,
 });
 
+/**
+ * 桌宠缩放：界面上的百分比以「基准尺寸」为 100%。
+ * 基准取素材原始尺寸的 40%（720px 的素材即 288px），
+ * 这样 10%~150% 正好覆盖 72px ~ 432px，在小屏上七档都可用的。
+ */
+const PET_BASE_SCALE = 0.4;
+const PET_ZOOMS = [10, 20, 30, 50, 80, 100, 150];
+
 const DEFAULT_PET = Object.freeze({
-  scale: 0.4,
+  zoom: 100,
   x: null,
   y: null,
   alwaysOnTop: true,
-  clickThrough: false,
 });
+
+/** 百分比 → 素材像素的缩放系数 */
+function effectiveScale(zoom) {
+  const z = typeof zoom === 'number' && zoom > 0 ? zoom : 100;
+  return PET_BASE_SCALE * (z / 100);
+}
 
 function nowId() {
   return crypto.randomBytes(8).toString('hex');
@@ -93,6 +106,20 @@ function migrate(cfg) {
   out.version = CONFIG_VERSION;
   out.assets = Array.isArray(cfg.assets) ? cfg.assets : [];
   out.pet = Object.assign({}, DEFAULT_PET, cfg.pet || {});
+
+  // 老配置里存的是原始 scale（0.4），换算成百分比并吸附到最近的档位
+  if (cfg.pet && typeof cfg.pet.scale === 'number' && cfg.pet.zoom == null) {
+    const percent = (cfg.pet.scale / PET_BASE_SCALE) * 100;
+    out.pet.zoom = PET_ZOOMS.reduce(
+      (best, z) => (Math.abs(z - percent) < Math.abs(best - percent) ? z : best),
+      PET_ZOOMS[0]
+    );
+  }
+  if (typeof out.pet.zoom !== 'number' || !PET_ZOOMS.includes(out.pet.zoom)) {
+    out.pet.zoom = 100;
+  }
+  delete out.pet.scale;
+  delete out.pet.clickThrough;
   out.behavior = Object.assign({}, base.behavior, cfg.behavior || {});
   out.system = cfg.system && typeof cfg.system === 'object' ? cfg.system : {};
 
@@ -130,6 +157,9 @@ module.exports = {
   CONFIG_VERSION,
   DEFAULT_KEYING,
   DEFAULT_PET,
+  PET_BASE_SCALE,
+  PET_ZOOMS,
+  effectiveScale,
   nowId,
   userDataDir,
   assetsDir,

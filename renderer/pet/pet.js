@@ -300,6 +300,12 @@ async function init() {
     const typing = functionById('typing');
     if (typing && typing.assetId) activate('typing');
   });
+  // 右键菜单里改了缩放，按当前正在播放的素材重新上报尺寸
+  api.pet.onRefit(() => {
+    const layer = state.layers[state.front];
+    const v = layer && layer.video;
+    if (v && v.videoWidth) api.pet.fit({ width: v.videoWidth, height: v.videoHeight });
+  });
 
   await activate('idle');
   setInterval(tick, 250);

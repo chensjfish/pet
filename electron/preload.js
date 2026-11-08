@@ -27,5 +27,6 @@ contextBridge.exposeInMainWorld('api', {
     menu: () => ipcRenderer.invoke('pet:menu'),
     openSettings: () => ipcRenderer.invoke('settings:open'),
     onActivity: (cb) => subscribe('pet:activity', cb),
+    onRefit: (cb) => subscribe('pet:refit', cb),
   },
 });
