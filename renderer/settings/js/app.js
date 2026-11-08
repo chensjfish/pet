@@ -15,7 +15,6 @@ const state = {
   config: null,
   tab: 'assets',
   fnId: 'idle',
-  keyingFnId: null,
   thumbs: new Map(),
   firstRun: false,
   probing: false,
@@ -69,15 +68,6 @@ const ctx = {
   toast,
   rerender: () => render(),
   onCleanup: (fn) => { activeCleanup = fn; },
-  openKeying: (fnId) => {
-    state.tab = 'functions';
-    state.keyingFnId = fnId;
-    render();
-  },
-  closeKeying: () => {
-    state.keyingFnId = null;
-    render();
-  },
   ensureThumbs,
 };
 
@@ -208,7 +198,6 @@ function bindNav() {
     const tab = btn.dataset.tab;
     if (!tab || tab === state.tab) return;
     state.tab = tab;
-    state.keyingFnId = null;
     render();
   });
 }

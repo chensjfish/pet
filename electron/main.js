@@ -579,16 +579,68 @@ async function runSmoke() {
     await settingsWin.webContents.executeJavaScript(
       `document.querySelector('.nav-item[data-tab="functions"]').click(); true`
     );
-    await delay(600);
+    await delay(1500);
     await shot(settingsWin, 'settings-functions');
 
+    const dom = await settingsWin.webContents.executeJavaScript(`(() => {
+      const host = document.querySelector('.keying-host');
+      const body = document.querySelector('.main-body');
+      const stage = document.querySelector('.preview-stage');
+      const side = document.querySelector('.keying-side');
+      const r = (el) => (el ? Math.round(el.getBoundingClientRect().height) : 0);
+      return {
+        hasEditor: !!document.querySelector('.keying .preview-stage canvas'),
+        sliders: document.querySelectorAll('.keying-side input[type="range"]').length,
+        assetSelect: !!document.querySelector('.asset-bar select'),
+        placeholder: !!document.querySelector('.panel-placeholder'),
+        hostHeight: r(host),
+        stageHeight: r(stage),
+        sideHeight: r(side),
+        scroll: body ? { content: body.scrollHeight, visible: body.clientHeight } : null,
+        parts: {
+          panel: r(document.querySelector('.keying-side .panel')),
+          preview: r(document.querySelector('.preview-panel')),
+          title: r(document.querySelector('.keying-side .panel-title')),
+          hint: r(document.querySelector('.hint-bar')),
+          color: r(document.querySelector('.color-row')),
+          grid: r(document.querySelector('.param-grid')),
+          field: r(document.querySelector('.param-grid .field')),
+          reset: r(document.querySelector('.panel-reset')),
+          assetBar: r(document.querySelector('.asset-bar')),
+        },
+      };
+    })()`);
+    log('功能页结构', JSON.stringify(dom));
+
     await settingsWin.webContents.executeJavaScript(`
-      const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === '进入抠像设置');
-      if (b) b.click();
+      const items = [...document.querySelectorAll('.fn-item')];
+      const target = items.find((b) => b.textContent.includes('敲击键盘'));
+      if (target) target.click();
+      true
+    `);
+    await delay(1600);
+    await shot(settingsWin, 'settings-functions-typing');
+
+    // 切到自带 alpha 的素材，确认参数面板收窄成「只有不透明度」
+    await settingsWin.webContents.executeJavaScript(`
+      const sel = document.querySelector('.asset-bar select');
+      if (!sel) true;
+      else {
+        const opt = [...sel.options].find((o) => o.textContent.includes('绿背景'));
+        if (opt) {
+          sel.value = opt.value;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
       true
     `);
     await delay(1800);
-    await shot(settingsWin, 'settings-keying');
+    const alphaDom = await settingsWin.webContents.executeJavaScript(`(() => ({
+      sliders: document.querySelectorAll('.keying-side input[type="range"]').length,
+      title: (document.querySelector('.keying-side .panel-title') || {}).textContent || '',
+    }))()`);
+    log('透明通道素材面板', JSON.stringify(alphaDom));
+    await shot(settingsWin, 'settings-functions-alpha');
   } catch (err) {
     log('自检交互失败', err.message);
   }

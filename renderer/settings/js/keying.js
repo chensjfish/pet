@@ -77,6 +77,12 @@ class Preview {
     this.draw();
   }
 
+  destroy() {
+    this.pause();
+    this.video.removeAttribute('src');
+    this.video.load();
+  }
+
   /** 在预览画面上取色，坐标是相对 canvas 的 CSS 像素 */
   sample(clientX, clientY) {
     const rect = this.canvas.getBoundingClientRect();
@@ -153,38 +159,14 @@ function previewBackground(stage, mode) {
   stage.classList.add(mode === 'dark' ? 'bg-dark' : mode === 'light' ? 'bg-light' : 'bg-checker');
 }
 
-export function renderKeying({ header, body, ctx, fn }) {
+/**
+ * 在给定容器里挂载一套「预览 + 参数」的抠像编辑器。
+ * 直接嵌在功能详情页里使用，不再单独占一个页面。
+ * 返回 { destroy }，由外层的重绘流程负责调用。
+ */
+export function createKeyingEditor({ ctx, fn, asset, host }) {
   const state = ctx.state;
-  const asset = state.config.assets.find((a) => a.id === fn.assetId);
   const keying = Object.assign({}, DEFAULT_PARAMS, fn.keying || {});
-
-  header.append(
-    h('div', {},
-      h('h1', { class: 'header-title' }, '抠像设置 · ' + fn.name),
-      h('p', { class: 'header-desc' },
-        asset && asset.hasAlpha
-          ? '这段素材自带透明通道，背景已经是干净的。拖时间轴逐帧看一下边缘，再决定要不要调不透明度。'
-          : '拖动时间轴停在最难抠的一帧，再调参数。绿色边缘在深色背景上最明显，建议三种背景都过一遍。')
-    ),
-    h('div', { class: 'header-actions' },
-      h('button', {
-        class: 'btn',
-        type: 'button',
-        onclick: () => ctx.closeKeying(),
-      }, '返回功能列表')
-    )
-  );
-
-  if (!asset) {
-    body.append(
-      h('div', { class: 'empty' },
-        h('div', { class: 'empty-title' }, '这个功能还没有绑定动画'),
-        h('p', { class: 'empty-desc' }, '回到功能列表选一个动画素材，再来调抠像参数。'),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => ctx.closeKeying() }, '去选择素材')
-      )
-    );
-    return;
-  }
 
   const canvas = h('canvas');
   const stage = h('div', { class: 'preview-stage bg-checker' }, canvas);
@@ -194,12 +176,12 @@ export function renderKeying({ header, body, ctx, fn }) {
   const timeline = h('input', { type: 'range', min: '0', max: '1', step: '0.01', value: '0' });
   const playBtn = h('button', { class: 'btn btn-sm', type: 'button' }, '播放');
 
-  let swatch;
-  let codeText;
+  let swatch = null;
+  let codeText = null;
 
-  const bgButtons = ['棋盘格', '深色', '浅色'].map((label, i) => {
-    const modes = ['checker', 'dark', 'light'];
-    return h('button', {
+  const modes = ['checker', 'dark', 'light'];
+  const bgButtons = ['棋盘格', '深色', '浅色'].map((label, i) =>
+    h('button', {
       class: i === 0 ? 'active' : '',
       type: 'button',
       onclick: (e) => {
@@ -207,37 +189,48 @@ export function renderKeying({ header, body, ctx, fn }) {
         e.target.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
         e.target.classList.add('active');
       },
-    }, label);
-  });
+    }, label)
+  );
 
-  body.append(
+  // 说明条：鼠标移到哪个参数上就显示哪个的说明，省掉每个滑块下面那行文字
+  const DEFAULT_HELP = asset.hasAlpha
+    ? '这段素材自带透明通道，背景本来就是透明的，只需调不透明度。'
+    : '在预览画面上点一下可以吸取色键颜色，时间轴可以停在任意一帧。';
+  const hintBar = h('p', { class: 'panel-desc hint-bar', text: DEFAULT_HELP });
+  const setHint = (text) => { hintBar.textContent = text || DEFAULT_HELP; };
+
+  const sidePanel = h('div', { class: 'panel' },
+    h('div', { class: 'panel-title' }, asset.hasAlpha ? '显示设置' : '抠像参数'),
+    hintBar,
+    asset.hasAlpha ? null : buildColorField(),
+    buildSliders(),
+    asset.hasAlpha ? null : h('button', {
+      class: 'btn btn-sm panel-reset',
+      type: 'button',
+      onclick: () => {
+        Object.assign(fn.keying, DEFAULT_PARAMS);
+        commit(Object.assign({}, DEFAULT_PARAMS));
+        if (swatch) swatch.style.background = DEFAULT_PARAMS.keyColor;
+        if (codeText) codeText.textContent = DEFAULT_PARAMS.keyColor.toUpperCase();
+      },
+    }, '恢复默认参数')
+  );
+
+  host.append(
     h('div', { class: 'keying' },
       h('div', { class: 'preview-panel' },
-        h('div', { class: 'preview-toolbar' },
-          h('div', { class: 'segmented' }, bgButtons),
-          playBtn
-        ),
+        h('div', { class: 'preview-toolbar' }, h('div', { class: 'segmented' }, bgButtons), playBtn),
         stage,
         h('div', { class: 'timeline' }, timeCur, timeline, timeTotal)
       ),
-      h('div', { class: 'keying-side' },
-        h('div', { class: 'panel' },
-          h('div', { class: 'panel-title' }, asset.hasAlpha ? '显示设置' : '抠像参数'),
-          h('p', { class: 'panel-desc' },
-            asset.hasAlpha
-              ? '这段素材自带透明通道，背景本来就是透明的，不用做色键抠像。'
-              : '在预览画面上点击可以吸取色键颜色。'),
-          asset.hasAlpha ? null : buildColorField(),
-          buildSliders()
-        )
-      )
+      h('div', { class: 'keying-side' }, sidePanel)
     ),
     video
   );
 
   const preview = new Preview(canvas, video, stage);
 
-  function commit(patch, { rerenderPanel = false } = {}) {
+  function commit(patch) {
     Object.assign(fn.keying, patch);
     preview.params = Object.assign(preview.params, fn.keying);
     if (!preview.playing) preview.draw();
@@ -246,7 +239,6 @@ export function renderKeying({ header, body, ctx, fn }) {
         f.id === fn.id ? Object.assign({}, f, { keying: Object.assign({}, fn.keying) }) : f
       ),
     });
-    if (rerenderPanel) ctx.rerender();
   }
 
   function buildColorField() {
@@ -256,23 +248,24 @@ export function renderKeying({ header, body, ctx, fn }) {
       title: '点击预览画面取色',
     });
     codeText = h('span', { class: 'color-code', text: keying.keyColor.toUpperCase() });
-    return h('div', { class: 'field' },
-      h('div', { class: 'field-label' }, '色键颜色'),
-      h('div', { class: 'color-field' },
-        swatch,
-        codeText,
-        h('button', {
-          class: 'btn btn-sm btn-ghost',
-          type: 'button',
-          onclick: () => {
-            const c = preview.autoColor();
-            if (!c) return;
-            applyColor(c);
-          },
-        }, '自动取色')
-      ),
-      h('div', { class: 'field-hint' }, '默认取画面四角平均色，也可以直接在预览上点背景')
+    const row = h('div', { class: 'color-row' },
+      h('span', { class: 'field-label' }, '色键颜色'),
+      swatch,
+      codeText,
+      h('button', {
+        class: 'btn btn-sm btn-ghost',
+        type: 'button',
+        onclick: () => {
+          const c = preview.autoColor();
+          if (c) applyColor(c);
+        },
+      }, '自动取色')
     );
+    const text = '要和素材的绿色背景一致。点「自动取色」取四角平均色，或直接在预览上点背景取样。';
+    row.title = text;
+    row.addEventListener('mouseenter', () => setHint(text));
+    row.addEventListener('mouseleave', () => setHint(null));
+    return row;
   }
 
   function applyColor(hex) {
@@ -283,7 +276,7 @@ export function renderKeying({ header, body, ctx, fn }) {
   }
 
   function buildSliders() {
-    const wrap = h('div', {});
+    const wrap = h('div', { class: 'param-grid' + (asset.hasAlpha ? ' single' : '') });
 
     if (asset.hasAlpha) {
       wrap.append(
@@ -293,6 +286,7 @@ export function renderKeying({ header, body, ctx, fn }) {
           min: 0.1, max: 1, step: 0.01, value: keying.opacity,
           format: (v) => Math.round(v * 100) + '%',
           onInput: (v) => commit({ opacity: v }),
+          onHint: setHint,
         })
       );
       return wrap;
@@ -305,6 +299,7 @@ export function renderKeying({ header, body, ctx, fn }) {
         min: 0, max: 1, step: 0.01, value: keying.similarity,
         format: (v) => fmtNum(v),
         onInput: (v) => commit({ similarity: v }),
+        onHint: setHint,
       }),
       slider({
         label: '柔和度',
@@ -312,6 +307,7 @@ export function renderKeying({ header, body, ctx, fn }) {
         min: 0, max: 0.5, step: 0.005, value: keying.smoothness,
         format: (v) => fmtNum(v, 3),
         onInput: (v) => commit({ smoothness: v }),
+        onHint: setHint,
       }),
       slider({
         label: '溢色抑制',
@@ -319,6 +315,7 @@ export function renderKeying({ header, body, ctx, fn }) {
         min: 0, max: 1, step: 0.01, value: keying.spill,
         format: (v) => fmtNum(v),
         onInput: (v) => commit({ spill: v }),
+        onHint: setHint,
       }),
       slider({
         label: '边缘收缩',
@@ -326,6 +323,7 @@ export function renderKeying({ header, body, ctx, fn }) {
         min: 0, max: 4, step: 0.25, value: keying.shrink,
         format: (v) => (v === 0 ? '关闭' : fmtNum(v, 2) + ' px'),
         onInput: (v) => commit({ shrink: v }),
+        onHint: setHint,
       }),
       slider({
         label: '暗部保护',
@@ -333,6 +331,7 @@ export function renderKeying({ header, body, ctx, fn }) {
         min: 0, max: 0.3, step: 0.005, value: keying.lumaFloor,
         format: (v) => (v === 0 ? '关闭' : fmtNum(v, 3)),
         onInput: (v) => commit({ lumaFloor: v }),
+        onHint: setHint,
       }),
       slider({
         label: '不透明度',
@@ -340,33 +339,21 @@ export function renderKeying({ header, body, ctx, fn }) {
         min: 0.1, max: 1, step: 0.01, value: keying.opacity,
         format: (v) => Math.round(v * 100) + '%',
         onInput: (v) => commit({ opacity: v }),
-      }),
-      h('button', {
-        class: 'btn btn-sm',
-        type: 'button',
-        style: { marginTop: '6px' },
-        onclick: () => {
-          Object.assign(fn.keying, DEFAULT_PARAMS);
-          commit(Object.assign({}, DEFAULT_PARAMS), { rerenderPanel: true });
-        },
-      }, '恢复默认参数')
+        onHint: setHint,
+      })
     );
     return wrap;
   }
 
-  // 预览上取色
   stage.addEventListener('click', (e) => {
     const hex = preview.sample(e.clientX, e.clientY);
     if (hex) applyColor(hex);
   });
 
-  // 时间轴
   timeline.addEventListener('input', () => {
     const t = Number(timeline.value);
     timeCur.textContent = t.toFixed(2) + 's';
-    if (!preview.playing) {
-      video.currentTime = t;
-    }
+    if (!preview.playing) video.currentTime = t;
   });
 
   video.addEventListener('seeked', () => {
@@ -401,9 +388,12 @@ export function renderKeying({ header, body, ctx, fn }) {
     .catch((err) => {
       console.error('抠像预览加载失败', err);
       clear(stage);
-      stage.append(h('div', { class: 'empty-desc', text: '预览加载失败：' + err.message }));
+      stage.append(h('div', { class: 'stage-error', text: '预览加载失败：' + err.message }));
     });
 
-  // 离开页面时释放解码资源
-  if (ctx.onCleanup) ctx.onCleanup(() => preview.pause());
+  return {
+    destroy() {
+      preview.destroy();
+    },
+  };
 }

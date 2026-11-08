@@ -71,9 +71,13 @@ export function debounce(fn, ms) {
   };
 }
 
-/** 带数值读数的滑块，抠像参数面板复用 */
+/**
+ * 带数值读数的滑块。
+ * hint 不直接显示在下面（太占高度），而是通过 onHint 回调交给外层的说明条，
+ * 鼠标移入或聚焦时展示，移出时复原。
+ */
 export function slider(opts) {
-  const { label, hint, min, max, step, value, format, onInput } = opts;
+  const { label, hint, min, max, step, value, format, onInput, onHint } = opts;
   const input = h('input', {
     type: 'range',
     min: String(min),
@@ -92,11 +96,21 @@ export function slider(opts) {
     fill();
     if (onInput) onInput(Number(input.value));
   });
-  const row = h('div', { class: 'field' },
+
+  const row = h('div', { class: 'field', title: hint || '' },
     h('div', { class: 'field-label' }, label),
-    h('div', { class: 'slider-row' }, input, readout),
-    hint ? h('div', { class: 'field-hint' }, hint) : null
+    h('div', { class: 'slider-row' }, input, readout)
   );
+
+  if (onHint && hint) {
+    const show = () => onHint(hint);
+    const hide = () => onHint(null);
+    row.addEventListener('mouseenter', show);
+    row.addEventListener('mouseleave', hide);
+    row.addEventListener('focusin', show);
+    row.addEventListener('focusout', hide);
+  }
+
   row.setValue = (v) => {
     input.value = String(v);
     fill();

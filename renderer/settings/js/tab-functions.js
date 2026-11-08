@@ -1,21 +1,7 @@
-import { h, fmtNum } from './util.js';
-import { renderKeying } from './keying.js';
-import { DEFAULT_PARAMS } from '../../shared/keyer.js';
+import { h } from './util.js';
+import { createKeyingEditor } from './keying.js';
 
-const FN_DESC = {
-  idle: '平时常驻播放的动画。',
-  typing: '检测到键盘输入时切换到这个动画，停手后自动回到待机。',
-};
-
-function keyingSummary(keying, asset) {
-  const k = Object.assign({}, DEFAULT_PARAMS, keying || {});
-  if (asset && asset.hasAlpha) {
-    return `自带透明通道 · 不透明度 ${Math.round(k.opacity * 100)}%`;
-  }
-  return `相似度 ${fmtNum(k.similarity)} · 柔和度 ${fmtNum(k.smoothness, 3)} · 溢色 ${fmtNum(k.spill)}`;
-}
-
-function selectAsset(ctx, fn, assets) {
+function assetSelect(ctx, fn, assets) {
   const select = h('select', {
     onchange: (e) => {
       const id = e.target.value || null;
@@ -36,24 +22,25 @@ function selectAsset(ctx, fn, assets) {
   return select;
 }
 
+function assetMeta(asset) {
+  if (!asset) return '';
+  const parts = [];
+  if (asset.width && asset.height) parts.push(`${asset.width}×${asset.height}`);
+  if (asset.duration) parts.push(asset.duration.toFixed(2) + 's');
+  if (asset.hasAlpha) parts.push('自带透明通道');
+  return parts.join(' · ');
+}
+
 export default {
   render({ header, body, ctx }) {
     const state = ctx.state;
     const config = state.config;
 
-    const keyingFn = state.keyingFnId
-      ? config.functions.find((f) => f.id === state.keyingFnId)
-      : null;
-    if (keyingFn) {
-      renderKeying({ header, body, ctx, fn: keyingFn });
-      return;
-    }
-
     header.append(
       h('div', {},
         h('h1', { class: 'header-title' }, '功能模块'),
         h('p', { class: 'header-desc' },
-          '每个功能绑定一段动画。选好动画后再进抠像设置，把它变成透明背景。')
+          '左边选功能，右边直接挑动画、调抠像。改动即时保存并作用到桌面上的桌宠。')
       )
     );
 
@@ -73,7 +60,6 @@ export default {
 
     const list = h('div', { class: 'fn-list' });
     for (const fn of config.functions) {
-      const asset = config.assets.find((a) => a.id === fn.assetId);
       list.append(
         h('button', {
           class: 'fn-item' + (fn.id === selectedId ? ' active' : ''),
@@ -83,8 +69,7 @@ export default {
             ctx.rerender();
           },
         },
-          h('span', { class: 'fn-item-name', text: fn.name }),
-          h('span', { class: 'fn-item-sub', text: asset ? asset.name : '未绑定素材' })
+          h('span', { class: 'fn-item-name', text: fn.name })
         )
       );
     }
@@ -92,46 +77,29 @@ export default {
     const fn = config.functions.find((f) => f.id === selectedId);
     const asset = config.assets.find((a) => a.id === fn.assetId);
 
-    const detail = h('div', {},
-      h('div', { class: 'panel' },
-        h('h2', { class: 'panel-title' }, fn.name),
-        h('p', { class: 'panel-desc' }, FN_DESC[fn.id] || ''),
-        h('div', { class: 'field' },
-          h('div', { class: 'field-label' }, '动画素材'),
-          selectAsset(ctx, fn, config.assets),
-          h('div', { class: 'field-hint' },
-            asset
-              ? `${asset.width || '?'}×${asset.height || '?'} · ${(asset.duration || 0).toFixed(2)}s`
-              : '选择一段绿幕动画作为这个功能的画面')
-        )
-      ),
-      h('div', { class: 'panel' },
-        h('h2', { class: 'panel-title' }, '抠像'),
-        h('p', { class: 'panel-desc' }, '把绿幕背景去掉，让桌宠透明地贴在桌面上。'),
-        h('div', { class: 'field' },
-          h('div', { class: 'field-label' }, '当前参数'),
-          h('div', { class: 'field-hint mono', text: asset ? keyingSummary(fn.keying, asset) : '先绑定动画素材' })
-        ),
-        h('button', {
-          class: 'btn btn-primary',
-          type: 'button',
-          disabled: !asset,
-          onclick: () => {
-            state.keyingFnId = fn.id;
-            ctx.rerender();
-          },
-        }, '进入抠像设置')
-      )
+    const assetBar = h('div', { class: 'asset-bar' },
+      h('span', { class: 'asset-bar-label', text: '动画素材' }),
+      assetSelect(ctx, fn, config.assets),
+      asset ? h('span', { class: 'asset-bar-meta', text: assetMeta(asset) }) : null
     );
 
-    body.append(
-      h('div', { class: 'fn-layout' },
-        h('div', {},
-          list,
-          h('div', { class: 'field-hint', style: { padding: '10px 12px 0' } }, '更多功能会在后续版本加入')
-        ),
-        detail
-      )
-    );
+    const detail = h('div', { class: 'fn-detail' }, assetBar);
+
+    const keyingHost = h('div', { class: 'keying-host' });
+    detail.append(keyingHost);
+
+    body.append(h('div', { class: 'fn-layout' }, list, detail));
+
+    if (asset) {
+      const editor = createKeyingEditor({ ctx, fn, asset, host: keyingHost });
+      ctx.onCleanup(() => editor.destroy());
+    } else {
+      keyingHost.append(
+        h('div', { class: 'panel panel-placeholder' },
+          h('div', { class: 'empty-desc', text: '这个功能还没绑定动画。在上面选一段素材，抠像设置就会出现在这里。' })
+        )
+      );
+      ctx.onCleanup(() => {});
+    }
   },
 };
