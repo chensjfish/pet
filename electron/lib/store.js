@@ -107,6 +107,15 @@ function migrate(cfg) {
   out.assets = Array.isArray(cfg.assets) ? cfg.assets : [];
   out.pet = Object.assign({}, DEFAULT_PET, cfg.pet || {});
 
+  // 素材名统一成「原文件名含扩展名」。老配置里存的是去扩展名的名字，
+  // 这里按素材实际文件的扩展名补回来，避免新旧命名混在一起
+  for (const a of out.assets) {
+    if (!a || typeof a.name !== 'string' || !a.file) continue;
+    if (path.extname(a.name)) continue;
+    const ext = path.extname(a.file);
+    if (ext) a.name = a.name + ext;
+  }
+
   // 老配置里存的是原始 scale（0.4），换算成百分比并吸附到最近的档位
   if (cfg.pet && typeof cfg.pet.scale === 'number' && cfg.pet.zoom == null) {
     const percent = (cfg.pet.scale / PET_BASE_SCALE) * 100;

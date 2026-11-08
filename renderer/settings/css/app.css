@@ -570,7 +570,7 @@ input[type="range"]:active::-webkit-slider-thumb {
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
   align-items: stretch;
-  height: calc(100vh - 246px);
+  height: calc(100vh - 246px - var(--footer-h, 0px));
   min-height: 280px;
 }
 
@@ -600,6 +600,20 @@ input[type="range"]:active::-webkit-slider-thumb {
 
 .param-grid .field {
   margin-bottom: 6px;
+}
+
+/* 首次启动多出引导条，参数区收紧一点，保证仍然一屏看全 */
+body.has-footer .param-grid .field {
+  margin-bottom: 0;
+}
+
+body.has-footer .hint-bar {
+  margin-bottom: 4px;
+}
+
+body.has-footer .keying-side .panel {
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .param-grid .field-label {

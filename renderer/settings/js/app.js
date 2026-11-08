@@ -84,6 +84,8 @@ function updateCounts() {
 function renderFooter() {
   clear(footer);
   footer.hidden = true;
+  // 首次启动会多一条引导栏，功能页需要知道这件事以便收紧一点间距
+  document.body.classList.toggle('has-footer', !!state.firstRun);
   if (!state.firstRun) return;
 
   footer.hidden = false;
@@ -124,6 +126,13 @@ function render() {
   const mod = tabs[state.tab];
   if (mod) mod.render({ header, body, footer, ctx });
   renderFooter();
+  syncFooterHeight();
+}
+
+/** 页脚高度写进 CSS 变量，功能页的网格高度据此让位，避免首次启动时出现滚动条 */
+function syncFooterHeight() {
+  const h = footer.hidden ? 0 : footer.offsetHeight;
+  document.documentElement.style.setProperty('--footer-h', h + 'px');
 }
 
 /* ------------------------------------------------------------ 数据 */

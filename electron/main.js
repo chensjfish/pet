@@ -367,7 +367,10 @@ function registerIpc() {
     });
     if (result.canceled || !result.filePaths.length) return { added: [], failed: [] };
 
-    const { added, failed } = assetsSvc.importFiles(result.filePaths);
+    const { added, failed } = assetsSvc.importFiles(
+      result.filePaths,
+      config.assets.map((a) => a.name)
+    );
     if (added.length) {
       config.assets.push(...added);
       save();
@@ -630,6 +633,7 @@ async function runSmoke() {
         hasEditor: !!document.querySelector('.keying .preview-stage canvas'),
         sliders: document.querySelectorAll('.keying-side input[type="range"]').length,
         assetSelect: !!document.querySelector('.asset-bar select'),
+        assetOptions: [...document.querySelectorAll('.asset-bar select option')].map((o) => o.textContent),
         placeholder: !!document.querySelector('.panel-placeholder'),
         hostHeight: r(host),
         stageHeight: r(stage),

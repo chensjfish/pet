@@ -67,8 +67,10 @@ function renderCard(ctx, asset, config) {
     : h('span', { class: 'thumb-fallback', text: thumb === '' ? '无法预览' : '加载中…' });
 
   const actions = h('div', { class: 'asset-actions' });
-  if (asset.hasAlpha) {
+  if (asset.hasAlpha === true) {
     actions.append(h('span', { class: 'pill', text: '自带透明通道' }));
+  } else if (asset.hasAlpha === false) {
+    actions.append(h('span', { class: 'pill', text: '绿幕抠像' }));
   }
   if (usedBy.length) {
     actions.append(h('span', { class: 'pill', text: '用于 ' + usedBy.join(' / ') }));

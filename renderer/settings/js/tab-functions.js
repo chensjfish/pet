@@ -15,7 +15,9 @@ function assetSelect(ctx, fn, assets) {
   });
   select.append(h('option', { value: '' }, '未选择'));
   for (const a of assets) {
-    const opt = h('option', { value: a.id }, a.name);
+    // 同名素材（绿幕版 / 透明通道版）靠后缀区分，否则下拉里两条一模一样
+    const tag = a.hasAlpha === true ? '  · 透明通道' : a.hasAlpha === false ? '  · 绿幕' : '';
+    const opt = h('option', { value: a.id }, a.name + tag);
     if (a.id === fn.assetId) opt.selected = true;
     select.append(opt);
   }
