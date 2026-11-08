@@ -39,10 +39,17 @@
       "icon": "build/icon.ico",
       "target": [
         {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
           "target": "zip",
           "arch": ["x64"]
         }
       ]
+    },
+    "portable": {
+      "artifactName": "桌宠-${version}-便携版.${ext}"
     }
   }
 }

@@ -3,6 +3,7 @@ node_modules/
 
 # 构建产物（build/ 存放图标等打包资源，需纳入版本管理）
 dist/
+dist-portable/
 out/
 release/
 
