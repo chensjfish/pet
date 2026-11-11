@@ -990,3 +990,316 @@ body.has-footer .keying-side .panel {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ------------------------------------------------------ 侧栏小伙伴 */
+
+.sidebar-pals {
+  position: relative;
+  margin: 4px -6px 0;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pals-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.pal-shadow {
+  fill: #2c2c2a;
+  opacity: 0.07;
+}
+
+/* 小狗 */
+.pal-dog .body,
+.pal-dog .skull {
+  fill: #e9b78c;
+}
+
+.pal-dog .ear path {
+  fill: #d3926a;
+}
+
+.pal-dog .muzzle {
+  fill: #fce9d8;
+}
+
+.pal-dog .nose {
+  fill: #7d5540;
+}
+
+.pal-dog .mouth {
+  stroke: #a5755a;
+  stroke-width: 1.2;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.pal-dog .blush {
+  fill: #e79d80;
+  opacity: 0.42;
+}
+
+.pal-dog .collar {
+  stroke: #e0a24c;
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.pal-dog .tag {
+  fill: #f6cf7e;
+}
+
+.pal-dog .tail path {
+  stroke: #d3926a;
+  stroke-width: 6.5;
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* 小猫 */
+.pal-cat .body,
+.pal-cat .skull {
+  fill: #b2d2c1;
+}
+
+.pal-cat .ear-outer {
+  fill: #94bca8;
+}
+
+.pal-cat .ear-inner {
+  fill: #e7bcc4;
+}
+
+.pal-cat .muzzle {
+  fill: #eff8f2;
+}
+
+.pal-cat .nose {
+  fill: #d79aa4;
+}
+
+.pal-cat .mouth {
+  stroke: #83a797;
+  stroke-width: 1.15;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.pal-cat .whisker {
+  stroke: #86ab99;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.pal-cat .blush {
+  fill: #e7a9ae;
+  opacity: 0.4;
+}
+
+.pal-cat .collar {
+  stroke: #d99b86;
+  stroke-width: 2.6;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.pal-cat .bell {
+  fill: #f6cf7e;
+  stroke: #d9a35c;
+  stroke-width: 0.8;
+}
+
+.pal-cat .tail path {
+  stroke: #94bca8;
+  stroke-width: 7;
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* 眼睛 */
+.sclera {
+  fill: #fffdf8;
+}
+
+.pupil-dot {
+  fill: #2c2c2a;
+}
+
+.glint {
+  fill: #ffffff;
+}
+
+/* 呼吸、摇尾巴、抖耳朵 */
+.pal,
+.tail,
+.ear,
+.head,
+.eye {
+  transform-box: fill-box;
+}
+
+.eye {
+  transform-origin: 50% 50%;
+}
+
+.pal-dog {
+  animation: pal-breathe 4.2s ease-in-out infinite;
+}
+
+.pal-cat {
+  animation: pal-breathe 4.8s ease-in-out -1.4s infinite;
+}
+
+.head {
+  transform-origin: 50% 88%;
+}
+
+.dog-tail {
+  transform-origin: 2% 100%;
+  animation: tail-wag 3.2s ease-in-out infinite;
+}
+
+.cat-tail {
+  transform-origin: 0% 100%;
+  animation: tail-wag 2.6s ease-in-out infinite;
+}
+
+.dog-ear-l {
+  transform-origin: 92% 4%;
+  animation: ear-twitch-l 7.8s ease-in-out infinite;
+}
+
+.dog-ear-r {
+  transform-origin: 8% 4%;
+  animation: ear-twitch-r 9.2s ease-in-out infinite;
+}
+
+.cat-ear-l {
+  transform-origin: 86% 92%;
+  animation: ear-twitch-l 6.6s ease-in-out infinite;
+}
+
+.cat-ear-r {
+  transform-origin: 14% 92%;
+  animation: ear-twitch-r 7.4s ease-in-out infinite;
+}
+
+@keyframes pal-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.1px);
+  }
+}
+
+@keyframes tail-wag {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
+}
+
+@keyframes ear-twitch-l {
+  0%,
+  86%,
+  100% {
+    transform: rotate(0deg);
+  }
+  89% {
+    transform: rotate(-6deg);
+  }
+  92.5% {
+    transform: rotate(2deg);
+  }
+  96% {
+    transform: rotate(-1deg);
+  }
+}
+
+@keyframes ear-twitch-r {
+  0%,
+  86%,
+  100% {
+    transform: rotate(0deg);
+  }
+  89% {
+    transform: rotate(6deg);
+  }
+  92.5% {
+    transform: rotate(-2deg);
+  }
+  96% {
+    transform: rotate(1deg);
+  }
+}
+
+/* 鼠标扫进来时，两只小东西原地弹一下 */
+.sidebar-pals.is-happy .pal {
+  animation: pal-hop 640ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sidebar-pals.is-happy .pal-cat {
+  animation-delay: 70ms;
+}
+
+@keyframes pal-hop {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+  38% {
+    transform: translateY(-5px) scale(0.98, 1.03);
+  }
+  70% {
+    transform: translateY(0) scale(1.03, 0.97);
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+
+/* 点一下冒个爱心 */
+.pal-heart {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: #e0868a;
+  pointer-events: none;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  animation: heart-float 900ms ease-out forwards;
+}
+
+@keyframes heart-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% - 26px)) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pal,
+  .tail,
+  .ear,
+  .sidebar-pals.is-happy .pal {
+    animation: none;
+  }
+}

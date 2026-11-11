@@ -1,5 +1,6 @@
 import { h, clear, toast } from './util.js';
 import { probeAsset } from './probe.js';
+import { mountPals } from './pals.js';
 import assetsTab from './tab-assets.js';
 import functionsTab from './tab-functions.js';
 import systemTab from './tab-system.js';
@@ -212,6 +213,8 @@ function bindNav() {
 }
 
 async function init() {
+  mountPals(document.getElementById('sidebarPals'));
+
   if (!api) {
     document.body.textContent = 'preload 未注入，无法读取配置';
     return;
