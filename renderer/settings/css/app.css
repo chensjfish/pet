@@ -815,34 +815,6 @@ body.has-footer .keying-side .panel {
   max-width: 42ch;
 }
 
-.placeholder-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.placeholder-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 13px 16px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface-alt);
-}
-
-.placeholder-item .name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.placeholder-item .sub {
-  font-size: 12px;
-  color: var(--text-faint);
-}
-
 .pill {
   padding: 2px 8px;
   border-radius: 999px;
@@ -902,4 +874,119 @@ body.has-footer .keying-side .panel {
   height: 1px;
   opacity: 0;
   pointer-events: none;
+}
+
+/* ------------------------------------------------------ 系统设置 */
+
+.setting-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.setting-main {
+  min-width: 0;
+}
+
+.setting-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.setting-desc {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-faint);
+  max-width: 58ch;
+}
+
+/* 系统设置页用紧凑版卡片，三张正好一屏放下 */
+.sys-card {
+  padding: 14px 16px;
+}
+
+.sys-card + .sys-card {
+  margin-top: 14px;
+}
+
+.setting-control {
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+
+.setting-control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.path-box {
+  margin-top: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-all;
+  user-select: all;
+  cursor: text;
+}
+
+.volume-row {
+  margin: 10px 0 0;
+}
+
+.field.is-disabled {
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+/* 开关 */
+.switch {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  width: 42px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--border-strong);
+  transition: background 160ms ease;
+  position: relative;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(44, 44, 42, 0.25);
+  transition: transform 160ms ease;
+}
+
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-track .switch-knob {
+  transform: translateX(18px);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

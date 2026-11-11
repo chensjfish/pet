@@ -196,6 +196,7 @@ function resizeAll() {
 
 function applyConfig(cfg) {
   state.config = cfg;
+  applyAudio();
   const currentId = state.activeFnId || 'idle';
   const fn = functionById(currentId);
   const layer = state.layers[state.front];
@@ -213,6 +214,23 @@ function applyConfig(cfg) {
 function needsReload(layer, asset) {
   if (!asset) return false;
   return layer.assetId !== asset.id;
+}
+
+/** 音效开关与音量：作用在两层 video 上，切换素材时沿用同一组元素所以不会丢 */
+function applyAudio() {
+  const sys = (state.config && state.config.system) || {};
+  const on = !!sys.sound;
+  const vol = typeof sys.volume === 'number' ? Math.min(1, Math.max(0, sys.volume)) : 0.5;
+  for (const layer of state.layers) {
+    const v = layer && layer.video;
+    if (!v) continue;
+    v.muted = !on;
+    try {
+      v.volume = vol;
+    } catch {
+      // 某些编码不支持音量调节时忽略
+    }
+  }
 }
 
 function tick() {
@@ -293,6 +311,7 @@ async function init() {
   bindInteractions();
 
   state.config = await api.getConfig();
+  applyAudio();
 
   api.onConfigChanged((cfg) => applyConfig(cfg));
   api.pet.onActivity(() => {

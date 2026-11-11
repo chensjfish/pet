@@ -115,5 +115,37 @@ export function slider(opts) {
     input.value = String(v);
     fill();
   };
+  row.setDisabled = (on) => {
+    input.disabled = !!on;
+    row.classList.toggle('is-disabled', !!on);
+  };
   return row;
+}
+
+/** 开关控件：原生 checkbox + 自绘轨道，保证键盘可达 */
+export function toggle(opts) {
+  const { checked, onChange } = opts;
+  const input = h('input', { type: 'checkbox' });
+  input.checked = !!checked;
+  input.addEventListener('change', () => {
+    if (onChange) onChange(input.checked);
+  });
+  const node = h('label', { class: 'switch' },
+    input,
+    h('span', { class: 'switch-track' }, h('span', { class: 'switch-knob' }))
+  );
+  node.setChecked = (v) => { input.checked = !!v; };
+  return node;
+}
+
+/** 统一的一行设置项：左边标题+说明，右边控件 */
+export function settingRow(title, desc, control, extra) {
+  return h('div', { class: 'setting-row' },
+    h('div', { class: 'setting-main' },
+      h('div', { class: 'setting-title', text: title }),
+      desc ? h('div', { class: 'setting-desc', text: desc }) : null,
+      extra || null
+    ),
+    h('div', { class: 'setting-control' }, control)
+  );
 }

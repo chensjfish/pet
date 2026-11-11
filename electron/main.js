@@ -66,8 +66,28 @@ function serializeConfig() {
     assets: config.assets.map((a) =>
       Object.assign({}, a, { url: proto.MEDIA_URL(a.file) })
     ),
-    meta: { isFirstRun, userData: store.userDataDir(), appVersion: app.getVersion() },
+    meta: {
+      isFirstRun,
+      userData: store.userDataDir(),
+      appVersion: app.getVersion(),
+      packaged: app.isPackaged,
+      dataSize: dataDirSize(),
+    },
   });
+}
+
+/** 素材文件 + 配置文件的总体积，给系统设置页展示用 */
+function dataDirSize() {
+  let total = 0;
+  for (const a of config.assets) {
+    if (typeof a.size === 'number') total += a.size;
+  }
+  try {
+    total += fs.statSync(store.configPath()).size;
+  } catch {
+    // 配置文件还没落盘时忽略
+  }
+  return total;
 }
 
 function save() {
@@ -86,6 +106,7 @@ function broadcast(exceptWebContents) {
 function applyPatch(patch) {
   if (!patch || typeof patch !== 'object') return;
   const prevZoom = config.pet.zoom;
+  const prevAutoStart = config.system.autoStart;
   if (Array.isArray(patch.functions)) config.functions = patch.functions;
   if (Array.isArray(patch.assets)) config.assets = patch.assets;
   if (patch.pet) config.pet = Object.assign({}, config.pet, patch.pet);
@@ -94,6 +115,28 @@ function applyPatch(patch) {
   save();
   if (config.pet.zoom !== prevZoom && petWin && !petWin.isDestroyed()) {
     petWin.webContents.send('pet:refit');
+  }
+  if (config.system.autoStart !== prevAutoStart) {
+    applyAutoStart(config.system.autoStart);
+  }
+}
+
+/**
+ * 开机自启。
+ * 便携版每次启动都会把自己解压到临时目录，process.execPath 指向的是临时副本，
+ * 写进注册表就会在下次开机时指向一个已经不存在的路径。
+ * electron-builder 会注入 PORTABLE_EXECUTABLE_FILE，那才是用户双击的那个 exe。
+ */
+function applyAutoStart(enabled) {
+  if (!app.isPackaged) return;
+  const exe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+  try {
+    const current = app.getLoginItemSettings({ path: exe }).openAtLogin;
+    if (current === !!enabled) return;
+    app.setLoginItemSettings({ openAtLogin: !!enabled, path: exe, args: [] });
+    log('开机自启已' + (enabled ? '开启' : '关闭'));
+  } catch (err) {
+    log('设置开机自启失败', err.message);
   }
 }
 
@@ -191,6 +234,8 @@ function createPetWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      // 开了音效后视频带声音，默认的自动播放策略会拦下 play()，这里显式放开
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
 
@@ -519,6 +564,8 @@ async function bootstrap() {
   }
 
   Menu.setApplicationMenu(null);
+  // 让开机自启的实际状态和配置对齐（用户在系统里手动改过也能纠正回来）
+  applyAutoStart(config.system.autoStart);
   createTray();
   registerIpc();
   startMonitor();
@@ -683,6 +730,50 @@ async function runSmoke() {
     }))()`);
     log('透明通道素材面板', JSON.stringify(alphaDom));
     await shot(settingsWin, 'settings-functions-alpha');
+
+    // 系统设置页
+    await settingsWin.webContents.executeJavaScript(
+      `document.querySelector('.nav-item[data-tab="system"]').click(); true`
+    );
+    await delay(900);
+    const sysDom = await settingsWin.webContents.executeJavaScript(`(() => ({
+      switches: document.querySelectorAll('.switch input').length,
+      sliders: document.querySelectorAll('.volume-row input[type="range"]').length,
+      volumeDisabled: (() => {
+        const el = document.querySelector('.volume-row');
+        return el ? el.classList.contains('is-disabled') : null;
+      })(),
+      path: (document.querySelector('.path-box') || {}).textContent || '',
+      scroll: (() => {
+        const b = document.querySelector('.main-body');
+        return b ? { content: b.scrollHeight, visible: b.clientHeight } : null;
+      })(),
+    }))()`);
+    log('系统设置页', JSON.stringify(sysDom));
+    await shot(settingsWin, 'settings-system');
+
+    // 打开音效，确认桌宠侧的 video 真的解除静音并应用了音量
+    if (petWin && !petWin.isDestroyed()) {
+      try {
+        await settingsWin.webContents.executeJavaScript(
+          `document.querySelectorAll('.switch input')[1].click(); true`
+        );
+        await delay(700);
+        const audio = await petWin.webContents.executeJavaScript(`(() => {
+          const a = document.getElementById('videoA');
+          const b = document.getElementById('videoB');
+          return { mutedA: a.muted, volA: +a.volume.toFixed(2), mutedB: b.muted, volB: +b.volume.toFixed(2) };
+        })()`);
+        log('音效开启后', JSON.stringify(audio));
+        await shot(settingsWin, 'settings-system-sound-on');
+        await settingsWin.webContents.executeJavaScript(
+          `document.querySelectorAll('.switch input')[1].click(); true`
+        );
+        await delay(400);
+      } catch (err) {
+        log('音效验证失败', err.message);
+      }
+    }
   } catch (err) {
     log('自检交互失败', err.message);
   }

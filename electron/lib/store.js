@@ -22,6 +22,12 @@ const DEFAULT_KEYING = Object.freeze({
   opacity: 1,
 });
 
+const DEFAULT_SYSTEM = Object.freeze({
+  autoStart: false,
+  sound: false,
+  volume: 0.5,
+});
+
 /**
  * 桌宠缩放：界面上的百分比以「基准尺寸」为 100%。
  * 基准取素材原始尺寸的 40%（720px 的素材即 288px），
@@ -130,7 +136,13 @@ function migrate(cfg) {
   delete out.pet.scale;
   delete out.pet.clickThrough;
   out.behavior = Object.assign({}, base.behavior, cfg.behavior || {});
-  out.system = cfg.system && typeof cfg.system === 'object' ? cfg.system : {};
+  out.system = Object.assign({}, DEFAULT_SYSTEM, cfg.system || {});
+  out.system.autoStart = !!out.system.autoStart;
+  out.system.sound = !!out.system.sound;
+  if (typeof out.system.volume !== 'number' || !Number.isFinite(out.system.volume)) {
+    out.system.volume = DEFAULT_SYSTEM.volume;
+  }
+  out.system.volume = Math.min(1, Math.max(0, out.system.volume));
 
   // 功能列表按 id 合并，保证内置功能即使配置里缺失也会补回来
   const incoming = Array.isArray(cfg.functions) ? cfg.functions : [];
@@ -166,6 +178,7 @@ module.exports = {
   CONFIG_VERSION,
   DEFAULT_KEYING,
   DEFAULT_PET,
+  DEFAULT_SYSTEM,
   PET_BASE_SCALE,
   PET_ZOOMS,
   effectiveScale,
